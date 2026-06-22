@@ -1,0 +1,112 @@
+# ─── Root Level ───────────────────────────────────────────────────
+
+# Environment variables (NEVER commit these)
+.env
+.env.local
+.env.production
+.env.staging
+.env.*.local
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Editor / IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ─── Frontend ─────────────────────────────────────────────────────
+
+# Dependencies
+frontend/node_modules/
+node_modules/
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# Cache
+frontend/.vite/
+frontend/.cache/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# ─── Backend ──────────────────────────────────────────────────────
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual environments
+backend/venv/
+backend/.venv/
+backend/env/
+venv/
+.venv/
+
+# Distribution / packaging
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# pytest / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# mypy
+.mypy_cache/
+
+# ─── Database ─────────────────────────────────────────────────────
+
+# Database dumps
+*.sql.bak
+*.dump
+
+# SQLite (if used for local testing)
+*.db
+*.sqlite3
+
+# ─── Deployment ───────────────────────────────────────────────────
+
+# Docker
+docker-compose.override.yml
+
+# Terraform / IaC
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# SSL certificates (NEVER commit)
+*.pem
+*.key
+*.crt
+*.csr

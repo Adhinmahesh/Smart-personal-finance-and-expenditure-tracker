@@ -1,4 +1,4 @@
- Smart Personal Finance & Expenditure Tracker
+## Smart Personal Finance & Expenditure Tracker
  
 A full-stack personal finance platform for tracking expenses and income, planning monthly budgets, comparing planned vs. actual spending, and managing loan repayment schedules.
  

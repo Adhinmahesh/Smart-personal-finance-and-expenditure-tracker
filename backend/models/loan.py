@@ -199,3 +199,21 @@ class LoanModel:
             if cur:
                 cur.close()
             release_connection(conn)
+
+    @staticmethod
+    def delete(user_id, loan_id):
+        conn = get_connection()
+        cur = None
+        try:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM loans WHERE id = %s AND user_id = %s RETURNING id", (loan_id, user_id))
+            deleted = cur.fetchone()
+            conn.commit()
+            return deleted is not None
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            if cur:
+                cur.close()
+            release_connection(conn)

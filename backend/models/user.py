@@ -78,3 +78,31 @@ class UserModel:
     @staticmethod
     def verify_password(stored_hash, provided_password):
         return bcrypt.checkpw(provided_password.encode('utf-8'), stored_hash.encode('utf-8'))
+
+    @staticmethod
+    def update_profile(user_id, name):
+        conn = get_connection()
+        cur = None
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "UPDATE users SET name = %s WHERE id = %s RETURNING id, email, name, created_at",
+                (name, user_id)
+            )
+            user = cur.fetchone()
+            conn.commit()
+            if user:
+                return {
+                    "id": user[0],
+                    "email": user[1],
+                    "name": user[2],
+                    "created_at": user[3]
+                }
+            return None
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            if cur:
+                cur.close()
+            release_connection(conn)

@@ -60,3 +60,31 @@ class CategoryModel:
             if cur:
                 cur.close()
             release_connection(conn)
+
+    @staticmethod
+    def update(user_id, category_id, name, icon, color, cat_type):
+        conn = get_connection()
+        cur = None
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE categories 
+                SET name = %s, icon = %s, color = %s, type = %s 
+                WHERE id = %s AND user_id = %s 
+                RETURNING id, name, icon, color, type
+                """,
+                (name, icon, color, cat_type, category_id, user_id)
+            )
+            row = cur.fetchone()
+            conn.commit()
+            if row:
+                return {"id": row[0], "name": row[1], "icon": row[2], "color": row[3], "type": row[4]}
+            return None
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            if cur:
+                cur.close()
+            release_connection(conn)

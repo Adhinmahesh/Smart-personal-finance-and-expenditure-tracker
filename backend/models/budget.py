@@ -61,3 +61,28 @@ class BudgetModel:
             if cur:
                 cur.close()
             release_connection(conn)
+
+    @staticmethod
+    def update(user_id, budget_id, category, daily, monthly, month):
+        conn = get_connection()
+        cur = None
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE budget_items 
+                SET category = %s, daily = %s, monthly = %s, month = %s 
+                WHERE id = %s AND user_id = %s 
+                RETURNING id, category, daily, monthly, month
+            """, (category, daily, monthly, month, budget_id, user_id))
+            row = cur.fetchone()
+            conn.commit()
+            if row:
+                return {"id": row[0], "category": row[1], "daily": float(row[2]), "monthly": float(row[3]), "month": row[4]}
+            return None
+        except Exception as e:
+            conn.rollback()
+            raise e
+        finally:
+            if cur:
+                cur.close()
+            release_connection(conn)

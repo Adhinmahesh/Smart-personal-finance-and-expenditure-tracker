@@ -2,6 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.loan_service import LoanService
 from utils.helpers import success_response, error_response
+from utils.extensions import limiter
 
 loans_bp = Blueprint('loans', __name__)
 
@@ -16,6 +17,7 @@ def get_loans():
     return success_response(result["data"])
 
 @loans_bp.route('', methods=['POST'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def add_loan():
     user_id = get_jwt_identity()
@@ -27,6 +29,7 @@ def add_loan():
     return success_response(result["data"], "Loan created successfully", result["status"])
 
 @loans_bp.route('/<string:loan_id>/pay', methods=['POST'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def pay_loan(loan_id):
     user_id = get_jwt_identity()
@@ -38,6 +41,7 @@ def pay_loan(loan_id):
     return success_response(None, "Payment recorded successfully", result["status"])
 
 @loans_bp.route('/<string:loan_id>/complete', methods=['PUT'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def complete_loan(loan_id):
     user_id = get_jwt_identity()
@@ -48,6 +52,7 @@ def complete_loan(loan_id):
     return success_response(None, "Loan marked as completed", result["status"])
 
 @loans_bp.route('/<string:loan_id>/reminder-type', methods=['PUT'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def update_reminder_type(loan_id):
     user_id = get_jwt_identity()
@@ -59,6 +64,7 @@ def update_reminder_type(loan_id):
     return success_response(None, "Reminder type updated", result["status"])
 
 @loans_bp.route('/<string:loan_id>/due-date', methods=['PUT'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def update_due_date(loan_id):
     user_id = get_jwt_identity()

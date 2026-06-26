@@ -2,6 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.budget_service import BudgetService
 from utils.helpers import success_response, error_response
+from utils.extensions import limiter
 
 budget_bp = Blueprint('budget', __name__)
 
@@ -16,6 +17,7 @@ def get_budget():
     return success_response(result["data"])
 
 @budget_bp.route('', methods=['POST'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def add_budget_item():
     user_id = get_jwt_identity()
@@ -27,6 +29,7 @@ def add_budget_item():
     return success_response(result["data"], "Budget item created successfully", result["status"])
 
 @budget_bp.route('/<string:budget_id>', methods=['DELETE'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def delete_budget(budget_id):
     user_id = get_jwt_identity()

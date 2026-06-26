@@ -2,6 +2,7 @@ from flask import Blueprint, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from services.transaction_service import TransactionService
 from utils.helpers import success_response, error_response
+from utils.extensions import limiter
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -17,6 +18,7 @@ def get_transactions():
     return success_response(result["data"], "Transactions fetched successfully", result["status"])
 
 @transactions_bp.route('', methods=['POST'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def add_transaction():
     user_id = get_jwt_identity()
@@ -28,6 +30,7 @@ def add_transaction():
     return success_response(result["data"], "Transaction created successfully", result["status"])
 
 @transactions_bp.route('/<string:tx_id>', methods=['DELETE'])
+@limiter.limit("30 per minute")
 @jwt_required()
 def delete_transaction(tx_id):
     user_id = get_jwt_identity()

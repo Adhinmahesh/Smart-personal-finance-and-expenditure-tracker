@@ -28,11 +28,9 @@ def login():
     return success_response(result["data"], "Login successful", result["status"])
 
 @auth_bp.route('/refresh', methods=['POST'])
+@limiter.limit("10 per minute")
 @jwt_required(refresh=True)
 def refresh():
-    # i will implement token refreshing here
-    # Since i need create_access_token here, i should do it or move it to service.
-    # Actually, i can just do it here:
     from flask_jwt_extended import create_access_token
     current_user_id = get_jwt_identity()
     new_access_token = create_access_token(identity=current_user_id)
@@ -49,6 +47,7 @@ def get_me():
     return success_response(result["data"], "User fetched successfully", result["status"])
 
 @auth_bp.route('/logout', methods=['POST'])
+@limiter.limit("10 per minute")
 @jwt_required()
 def logout():
     jti = get_jwt()["jti"]
@@ -56,4 +55,4 @@ def logout():
         TokenBlocklistModel.add_token(jti)
         return success_response(None, "Successfully logged out")
     except Exception as e:
-        return error_response(f"Logout failed: {str(e)}", 500)
+        return error_response("Logout failed", 500)

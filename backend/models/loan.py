@@ -53,9 +53,9 @@ class LoanModel:
                                    reminder_type, reminder_day, reminder_weekday, next_due, notes)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
-                user_id, data['title'], data['type'], data['startDate'], data.get('endDate'),
-                data.get('reminderType', 'monthly'), data.get('reminderDay'), 
-                data.get('reminderWeekday'), data.get('nextDue'), data.get('notes', '')
+                user_id, data['title'], data['loan_type'], data['start_date'], data.get('end_date'),
+                data.get('reminder_type', 'monthly'), data.get('reminder_day'), 
+                data.get('reminder_weekday'), data.get('next_due'), data.get('notes', '')
             ))
             row = cur.fetchone()
             loan_id = row[0] if row else None
@@ -65,10 +65,18 @@ class LoanModel:
             cur.execute("""
                 INSERT INTO loan_payments (loan_id, due_date, status)
                 VALUES (%s, %s, 'pending')
-            """, (loan_id, data.get('nextDue')))
+            """, (loan_id, data.get('next_due')))
             
             conn.commit()
-            return {"id": loan_id, **data, "payments": [], "totalPaid": 0, "status": "active"}
+            return {
+                "id": loan_id, "title": data['title'], "type": data['loan_type'],
+                "startDate": data['start_date'].isoformat() if data.get('start_date') else None,
+                "endDate": data['end_date'].isoformat() if data.get('end_date') else None,
+                "reminderType": data.get('reminder_type', 'monthly'), "reminderDay": data.get('reminder_day'),
+                "reminderWeekday": data.get('reminder_weekday'),
+                "nextDue": data['next_due'].isoformat() if data.get('next_due') else None,
+                "notes": data.get('notes', ''), "payments": [], "totalPaid": 0, "status": "active"
+            }
         except Exception as e:
             conn.rollback()
             raise e

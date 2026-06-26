@@ -28,6 +28,18 @@ def add_category():
         return error_response(result["error"], result["status"])
     return success_response(result["data"], "Category created successfully", result["status"])
 
+@categories_bp.route('/<string:category_id>', methods=['PUT'])
+@limiter.limit("30 per minute")
+@jwt_required()
+def update_category(category_id):
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    result = CategoryService.update_category(user_id, category_id, data)
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Category updated successfully", result["status"])
+
 @categories_bp.route('/<string:category_id>', methods=['DELETE'])
 @limiter.limit("30 per minute")
 @jwt_required()

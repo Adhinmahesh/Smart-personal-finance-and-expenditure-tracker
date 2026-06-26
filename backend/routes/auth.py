@@ -46,6 +46,18 @@ def get_me():
         return error_response(result["error"], result["status"])
     return success_response(result["data"], "User fetched successfully", result["status"])
 
+@auth_bp.route('/profile', methods=['PUT'])
+@limiter.limit("30 per minute")
+@jwt_required()
+def update_profile():
+    current_user_id = get_jwt_identity()
+    data = request.get_json()
+    result = AuthService.update_profile(current_user_id, data)
+    
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Profile updated successfully", result["status"])
+
 @auth_bp.route('/logout', methods=['POST'])
 @limiter.limit("10 per minute")
 @jwt_required()

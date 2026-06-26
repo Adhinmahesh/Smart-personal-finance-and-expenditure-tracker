@@ -74,3 +74,13 @@ def update_due_date(loan_id):
     if "error" in result:
         return error_response(result["error"], result["status"])
     return success_response(None, "Due date updated", result["status"])
+
+@loans_bp.route('/<string:loan_id>', methods=['DELETE'])
+@limiter.limit("30 per minute")
+@jwt_required()
+def delete_loan(loan_id):
+    user_id = get_jwt_identity()
+    result = LoanService.delete_loan(user_id, loan_id)
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(None, "Loan deleted successfully", result["status"])

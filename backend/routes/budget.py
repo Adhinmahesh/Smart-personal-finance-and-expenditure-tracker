@@ -28,6 +28,18 @@ def add_budget_item():
         return error_response(result["error"], result["status"])
     return success_response(result["data"], "Budget item created successfully", result["status"])
 
+@budget_bp.route('/<string:budget_id>', methods=['PUT'])
+@limiter.limit("30 per minute")
+@jwt_required()
+def update_budget(budget_id):
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    result = BudgetService.update_budget_item(user_id, budget_id, data)
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Budget item updated successfully", result["status"])
+
 @budget_bp.route('/<string:budget_id>', methods=['DELETE'])
 @limiter.limit("30 per minute")
 @jwt_required()

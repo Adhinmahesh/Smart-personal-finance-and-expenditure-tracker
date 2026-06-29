@@ -8,7 +8,7 @@ class CategoryModel:
         try:
             cur = conn.cursor()
             cur.execute(
-                "SELECT id, name, icon, color, type FROM categories WHERE user_id = %s",
+                "SELECT id, name, icon, color, type FROM categories WHERE user_id = %s AND deleted_at IS NULL",
                 (user_id,)
             )
             categories = cur.fetchall()
@@ -49,7 +49,7 @@ class CategoryModel:
         cur = None
         try:
             cur = conn.cursor()
-            cur.execute("DELETE FROM categories WHERE id = %s AND user_id = %s RETURNING id", (category_id, user_id))
+            cur.execute("UPDATE categories SET deleted_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING id", (category_id, user_id))
             deleted = cur.fetchone()
             conn.commit()
             return deleted is not None
@@ -70,8 +70,8 @@ class CategoryModel:
             cur.execute(
                 """
                 UPDATE categories 
-                SET name = %s, icon = %s, color = %s, type = %s 
-                WHERE id = %s AND user_id = %s 
+                SET name = %s, icon = %s, color = %s, type = %s, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s AND user_id = %s AND deleted_at IS NULL 
                 RETURNING id, name, icon, color, type
                 """,
                 (name, icon, color, cat_type, category_id, user_id)

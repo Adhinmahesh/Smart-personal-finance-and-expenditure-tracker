@@ -10,7 +10,7 @@ class BudgetModel:
             cur.execute("""
                 SELECT id, category, daily, monthly, month 
                 FROM budget_items 
-                WHERE user_id = %s
+                WHERE user_id = %s AND deleted_at IS NULL
             """, (user_id,))
             items = cur.fetchall()
             return [
@@ -50,7 +50,7 @@ class BudgetModel:
         cur = None
         try:
             cur = conn.cursor()
-            cur.execute("DELETE FROM budget_items WHERE id = %s AND user_id = %s RETURNING id", (budget_id, user_id))
+            cur.execute("UPDATE budget_items SET deleted_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING id", (budget_id, user_id))
             deleted = cur.fetchone()
             conn.commit()
             return deleted is not None
@@ -70,8 +70,8 @@ class BudgetModel:
             cur = conn.cursor()
             cur.execute("""
                 UPDATE budget_items 
-                SET category = %s, daily = %s, monthly = %s, month = %s 
-                WHERE id = %s AND user_id = %s 
+                SET category = %s, daily = %s, monthly = %s, month = %s, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s AND user_id = %s AND deleted_at IS NULL 
                 RETURNING id, category, daily, monthly, month
             """, (category, daily, monthly, month, budget_id, user_id))
             row = cur.fetchone()

@@ -10,8 +10,8 @@ class LoanModel:
             cur = conn.cursor()
             cur.execute("""
                 SELECT id, title, loan_type, start_date, end_date, reminder_type, 
-                       reminder_day, reminder_weekday, next_due, total_paid, notes, status 
-                FROM loans WHERE user_id = %s ORDER BY start_date DESC
+                       reminder_day, reminder_weekday, next_due, total_paid, notes, status, amount 
+                FROM loans WHERE user_id = %s AND deleted_at IS NULL ORDER BY start_date DESC
             """, (user_id,))
             loans_data = cur.fetchall()
             
@@ -28,7 +28,7 @@ class LoanModel:
                 ]
                 
                 loans.append({
-                    "id": loan_id, "title": l[1], "type": l[2], 
+                    "id": loan_id, "title": l[1], "type": l[2], "amount": float(l[12] or 0),
                     "startDate": l[3].isoformat() if l[3] else None, 
                     "endDate": l[4].isoformat() if l[4] else None,
                     "reminderType": l[5], "reminderDay": l[6], "reminderWeekday": l[7],
@@ -49,11 +49,11 @@ class LoanModel:
         try:
             cur = conn.cursor()
             cur.execute("""
-                INSERT INTO loans (user_id, title, loan_type, start_date, end_date, 
+                INSERT INTO loans (user_id, title, loan_type, amount, start_date, end_date, 
                                    reminder_type, reminder_day, reminder_weekday, next_due, notes)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id
             """, (
-                user_id, data['title'], data['loan_type'], data['start_date'], data.get('end_date'),
+                user_id, data['title'], data['loan_type'], data.get('amount', 0), data['start_date'], data.get('end_date'),
                 data.get('reminder_type', 'monthly'), data.get('reminder_day'), 
                 data.get('reminder_weekday'), data.get('next_due'), data.get('notes', '')
             ))
@@ -69,7 +69,7 @@ class LoanModel:
             
             conn.commit()
             return {
-                "id": loan_id, "title": data['title'], "type": data['loan_type'],
+                "id": loan_id, "title": data['title'], "type": data['loan_type'], "amount": float(data.get('amount', 0)),
                 "startDate": data['start_date'].isoformat() if data.get('start_date') else None,
                 "endDate": data['end_date'].isoformat() if data.get('end_date') else None,
                 "reminderType": data.get('reminder_type', 'monthly'), "reminderDay": data.get('reminder_day'),
@@ -117,7 +117,7 @@ class LoanModel:
                         next_due = datetime.date(today.year, today.month + 1, loan[2])
 
             cur.execute("""
-                UPDATE loans SET total_paid = total_paid + %s, next_due = %s WHERE id = %s
+                UPDATE loans SET total_paid = total_paid + %s, next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s
             """, (amount, next_due, loan_id))
             
             # Add new pending payment for next cycle
@@ -148,7 +148,7 @@ class LoanModel:
         cur = None
         try:
             cur = conn.cursor()
-            cur.execute("UPDATE loans SET status = 'completed' WHERE id = %s AND user_id = %s", (loan_id, user_id))
+            cur.execute("UPDATE loans SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (loan_id, user_id))
             conn.commit()
             return cur.rowcount > 0
         finally:
@@ -163,7 +163,7 @@ class LoanModel:
         try:
             cur = conn.cursor()
             cur.execute(
-                "UPDATE loans SET reminder_type = %s, next_due = %s WHERE id = %s AND user_id = %s",
+                "UPDATE loans SET reminder_type = %s, next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s",
                 (new_type, new_next_due, loan_id, user_id)
             )
             # Update pending payment's due date
@@ -186,11 +186,11 @@ class LoanModel:
             cur = conn.cursor()
             if change_type == 'permanent':
                 if reminder_type == 'monthly':
-                    cur.execute("UPDATE loans SET reminder_day = %s, next_due = %s WHERE id = %s AND user_id = %s", (new_value, next_due, loan_id, user_id))
+                    cur.execute("UPDATE loans SET reminder_day = %s, next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (new_value, next_due, loan_id, user_id))
                 else:
-                    cur.execute("UPDATE loans SET reminder_weekday = %s, next_due = %s WHERE id = %s AND user_id = %s", (new_value, next_due, loan_id, user_id))
+                    cur.execute("UPDATE loans SET reminder_weekday = %s, next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (new_value, next_due, loan_id, user_id))
             else:
-                cur.execute("UPDATE loans SET next_due = %s WHERE id = %s AND user_id = %s", (next_due, loan_id, user_id))
+                cur.execute("UPDATE loans SET next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (next_due, loan_id, user_id))
             
             cur.execute("UPDATE loan_payments SET due_date = %s WHERE loan_id = %s AND status = 'pending'", (next_due, loan_id))
             conn.commit()
@@ -206,7 +206,7 @@ class LoanModel:
         cur = None
         try:
             cur = conn.cursor()
-            cur.execute("DELETE FROM loans WHERE id = %s AND user_id = %s RETURNING id", (loan_id, user_id))
+            cur.execute("UPDATE loans SET deleted_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING id", (loan_id, user_id))
             deleted = cur.fetchone()
             conn.commit()
             return deleted is not None

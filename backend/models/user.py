@@ -86,7 +86,7 @@ class UserModel:
         try:
             cur = conn.cursor()
             cur.execute(
-                "UPDATE users SET name = %s WHERE id = %s RETURNING id, email, name, created_at",
+                "UPDATE users SET name = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s RETURNING id, email, name, created_at",
                 (name, user_id)
             )
             user = cur.fetchone()

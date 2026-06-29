@@ -10,7 +10,7 @@ class TransactionModel:
             cur = conn.cursor()
             
             # Dynamically build query and parameters
-            where_clauses = ["user_id = %s"]
+            where_clauses = ["user_id = %s", "deleted_at IS NULL"]
             params = [user_id]
             
             if start_date:
@@ -107,8 +107,8 @@ class TransactionModel:
             cur.execute(
                 """
                 UPDATE transactions 
-                SET category = %s, date = %s, amount = %s, notes = %s, type = %s 
-                WHERE id = %s AND user_id = %s 
+                SET category = %s, date = %s, amount = %s, notes = %s, type = %s, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = %s AND user_id = %s AND deleted_at IS NULL 
                 RETURNING id, category, date, amount, notes, type
                 """,
                 (category, date, amount, notes, tx_type, tx_id, user_id)
@@ -135,7 +135,7 @@ class TransactionModel:
         cur = None
         try:
             cur = conn.cursor()
-            cur.execute("DELETE FROM transactions WHERE id = %s AND user_id = %s RETURNING id", (tx_id, user_id))
+            cur.execute("UPDATE transactions SET deleted_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING id", (tx_id, user_id))
             deleted = cur.fetchone()
             conn.commit()
             return deleted is not None

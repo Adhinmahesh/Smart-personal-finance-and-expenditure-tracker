@@ -48,6 +48,7 @@ class LoanModel:
         cur = None
         try:
             cur = conn.cursor()
+            next_due_val = data.get('next_due') or data['start_date']
             cur.execute("""
                 INSERT INTO loans (user_id, title, loan_type, amount, start_date, end_date, 
                                    reminder_type, reminder_day, reminder_weekday, next_due, notes)
@@ -55,7 +56,7 @@ class LoanModel:
             """, (
                 user_id, data['title'], data['loan_type'], data.get('amount', 0), data['start_date'], data.get('end_date'),
                 data.get('reminder_type', 'monthly'), data.get('reminder_day'), 
-                data.get('reminder_weekday'), data.get('next_due'), data.get('notes', '')
+                data.get('reminder_weekday'), next_due_val, data.get('notes', '')
             ))
             row = cur.fetchone()
             loan_id = row[0] if row else None
@@ -65,7 +66,7 @@ class LoanModel:
             cur.execute("""
                 INSERT INTO loan_payments (loan_id, due_date, status)
                 VALUES (%s, %s, 'pending')
-            """, (loan_id, data.get('next_due')))
+            """, (loan_id, next_due_val))
             
             conn.commit()
             return {
@@ -74,7 +75,7 @@ class LoanModel:
                 "endDate": data['end_date'].isoformat() if data.get('end_date') else None,
                 "reminderType": data.get('reminder_type', 'monthly'), "reminderDay": data.get('reminder_day'),
                 "reminderWeekday": data.get('reminder_weekday'),
-                "nextDue": data['next_due'].isoformat() if data.get('next_due') else None,
+                "nextDue": next_due_val.isoformat() if next_due_val else None,
                 "notes": data.get('notes', ''), "payments": [], "totalPaid": 0, "status": "active"
             }
         except Exception as e:

@@ -6,8 +6,15 @@ flask-jwt-extended>=4.6.0
 bcrypt>=4.1.2
 marshmallow>=3.20.2
 flask-limiter>=3.5.0
+gunicorn>=22.0.0
 alembic>=1.13.0
 sqlalchemy>=2.0.0
+requests>=2.31.0
+google-auth>=2.29.0
+
+# Testing
+pytest>=8.0.0
+pytest-cov>=4.1.0
 
 # Type Stubs for IDE
 types-Flask-Cors>=4.0.0

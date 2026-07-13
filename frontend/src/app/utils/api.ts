@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 let isRefreshing = false;
@@ -107,7 +108,10 @@ export async function apiFetch(endpoint: string, options: RequestInit = {}) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.message || data.error || "An error occurred");
+    const error: any = new Error(data.message || data.error || "An error occurred");
+    error.data = data.data;
+    error.status = response.status;
+    throw error;
   }
 
   return data;

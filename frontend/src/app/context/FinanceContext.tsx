@@ -1,13 +1,13 @@
-import React, { createContext, useContext, ReactNode } from "react";
+import React, { createContext, useContext, useEffect, ReactNode } from "react";
 import { Transaction, Loan, Category, BudgetItem } from "../types";
 import { INIT_CATEGORIES } from "../utils/constants";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../components/common/Toast";
-import { toLocalDateStr, computeLoanNextDue, hasLoanPayments } from "../utils/formatters";
+import { toLocalDateStr, computeLoanNextDue, hasLoanPayments, getLatestPaidDueDate } from "../utils/formatters";
 
 // ── TanStack Query Hooks ─────────────────────────────────────────────────────
 import { useTransactionsQuery, useAddTransaction, useDeleteTransaction } from "../hooks/queries/useTransactionsQuery";
-import { useLoansQuery, useAddLoan, usePayLoan, useCompleteLoan, useChangeDueDate, useSwitchReminderType } from "../hooks/queries/useLoansQuery";
+import { useLoansQuery, useAddLoan, usePayLoan, useCompleteLoan, useChangeDueDate, useSwitchReminderType, useUpdateEndDate } from "../hooks/queries/useLoansQuery";
 import { useCategoriesQuery, useAddCategory, useEditCategory, useDeleteCategory } from "../hooks/queries/useCategoriesQuery";
 import { useBudgetQuery, useAddBudget, useDeleteBudget } from "../hooks/queries/useBudgetQuery";
 import { useQueryClient } from "@tanstack/react-query";
@@ -33,6 +33,7 @@ export interface FinanceContextType {
   completeLoan: (loanId: number) => Promise<void>;
   changeDueDate: (loanId: number, newValue: number, changeType: "temporary" | "permanent") => Promise<void>;
   switchReminderType: (loanId: number, newType: "monthly" | "weekly") => Promise<void>;
+  updateEndDate: (loanId: number, endDate: string | null, status?: string) => Promise<void>;
   addBudget: (b: Omit<BudgetItem, "id">) => Promise<void>;
   deleteBudget: (id: number) => Promise<void>;
 }
@@ -44,6 +45,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const isAuthenticated = !!currentUser;
+
+  useEffect(() => {
+    queryClient.clear();
+  }, [currentUser?.id, queryClient]);
 
   // ── Queries (automatic fetching, caching, background refetch) ──────────────
   const txQuery = useTransactionsQuery(isAuthenticated);
@@ -59,6 +64,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const completeLoanMutation = useCompleteLoan();
   const changeDueDateMutation = useChangeDueDate();
   const switchReminderMutation = useSwitchReminderType();
+  const updateEndDateMutation = useUpdateEndDate();
   const addCatMutation = useAddCategory();
   const editCatMutation = useEditCategory();
   const deleteCatMutation = useDeleteCategory();
@@ -199,6 +205,37 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     } catch (e) { showToast("Error switching reminder type", "error"); throw e; }
   };
 
+  const updateEndDate = async (loanId: number, endDate: string | null, status?: string) => {
+    const loan = loans.find(l => l.id === loanId);
+    if (!loan) return;
+    
+    const targetStatus = status || loan.status;
+    let nextDue: string | null = null;
+    if (targetStatus === "active") {
+      const day = loan.reminderType === "monthly" ? loan.reminderDay ?? 16 : 0;
+      const wd = loan.reminderType === "weekly" ? loan.reminderWeekday ?? 1 : 0;
+      nextDue = computeLoanNextDue(
+        loan.startDate,
+        loan.nextDue,
+        loan.reminderType,
+        day,
+        wd,
+        hasLoanPayments(loan),
+        getLatestPaidDueDate(loan)
+      );
+      if (endDate && nextDue > endDate) {
+        nextDue = null;
+      }
+    }
+    
+    try {
+      await updateEndDateMutation.mutateAsync({ loanId, endDate, nextDue, status: targetStatus });
+    } catch (e) {
+      showToast("Error updating end date", "error");
+      throw e;
+    }
+  };
+
   const addBudget = async (b: Omit<BudgetItem, "id">) => {
     try { await addBudgetMutation.mutateAsync(b); }
     catch (e) { showToast("Error adding budget", "error"); throw e; }
@@ -215,7 +252,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       refreshAll, fetchTransactions, fetchLoans, fetchCategories, fetchBudget,
       addTransaction, deleteTransaction,
       addCategory, editCategory, deleteCategory,
-      addLoan, payLoan, completeLoan, changeDueDate, switchReminderType,
+      addLoan, payLoan, completeLoan, changeDueDate, switchReminderType, updateEndDate,
       addBudget, deleteBudget
     }}>
       {children}

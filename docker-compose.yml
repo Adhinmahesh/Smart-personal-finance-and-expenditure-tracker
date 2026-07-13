@@ -1,0 +1,68 @@
+# ── Docker Compose — Smart Finance Tracker ────────────────────────
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose down            # Stop all services
+#   docker-compose logs -f backend # Follow backend logs
+
+services:
+  # ── PostgreSQL Database ───────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # No host port exposed — DB only accessible within Docker network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tracker-net
+
+  # ── Flask Backend (Gunicorn) ──────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=db
+      - FRONTEND_URL=http://localhost,http://localhost:5173
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    networks:
+      - tracker-net
+
+  # ── React Frontend (Nginx) ───────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - tracker-net
+
+# ── Volumes ─────────────────────────────────────────────────────
+volumes:
+  pgdata:
+
+# ── Networks ────────────────────────────────────────────────────
+networks:
+  tracker-net:
+    driver: bridge

@@ -3,7 +3,7 @@ import { Clock } from "lucide-react";
 import { Category, Transaction, Loan, BudgetItem } from "../../types";
 import { inputCls, btnPrimary, btnGhost, Modal, Field } from "../common/Shared";
 import { ICON_OPTIONS, COLOR_OPTIONS, LOAN_TYPES, WEEKDAY_NAMES } from "../../utils/constants";
-import { fmt, toLocalDateStr, todayStr, fmtDueDate, computeLoanNextDue, hasLoanPayments } from "../../utils/formatters";
+import { fmt, toLocalDateStr, todayStr, fmtDueDate, computeLoanNextDue, hasLoanPayments, getLatestPaidDueDate } from "../../utils/formatters";
 
 export function AddExpenseModal({ categories, onSave, onClose }: {
   categories: Category[];
@@ -283,7 +283,8 @@ export function ChangeDueDateModal({ loan, onSave, onClose }: {
     loan.reminderType,
     isMonthly ? (parseInt(newDay) || loan.reminderDay) : loan.reminderDay,
     isMonthly ? loan.reminderWeekday : parseInt(newWeekday),
-    hasLoanPayments(loan)
+    hasLoanPayments(loan),
+    getLatestPaidDueDate(loan)
   );
 
   const save = () => {
@@ -388,6 +389,83 @@ export function ChangeDueDateModal({ loan, onSave, onClose }: {
         <div className="flex gap-3 pt-1">
           <button onClick={onClose} className={btnGhost}>Cancel</button>
           <button onClick={save} className={btnPrimary}>Apply Change</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+export function ChangeEndDateModal({ loan, onSave, onClose }: {
+  loan: Loan;
+  onSave: (loanId: number, endDate: string | null, status?: string) => void;
+  onClose: () => void;
+}) {
+  const [endDate, setEndDate] = useState(loan.endDate || "");
+  const [reactivate, setReactivate] = useState(loan.status === "completed");
+  const [error, setError] = useState("");
+
+  const save = () => {
+    if (endDate && endDate < loan.startDate) {
+      setError("End date cannot be earlier than the start date (" + fmtDueDate(loan.startDate) + ")");
+      return;
+    }
+    const targetStatus = reactivate && loan.status === "completed" ? "active" : loan.status;
+    onSave(loan.id, endDate || null, targetStatus);
+    onClose();
+  };
+
+  return (
+    <Modal title={`Change End Date — ${loan.title}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 rounded-lg bg-neu shadow-neu-pressed border-0">
+            <p className="text-sm text-muted-foreground">Start Date</p>
+            <p className="text-base font-semibold text-foreground mt-0.5">{fmtDueDate(loan.startDate)}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-neu shadow-neu-pressed border-0">
+            <p className="text-sm text-muted-foreground">Current Status</p>
+            <p className={`text-base font-semibold mt-0.5 capitalize ${loan.status === 'completed' ? 'text-emerald-400' : 'text-primary'}`}>
+              {loan.status}
+            </p>
+          </div>
+        </div>
+
+        <Field label="New End Date (Leave empty for no end date)">
+          <input
+            type="date"
+            value={endDate}
+            min={loan.startDate}
+            onChange={e => { setEndDate(e.target.value); setError(""); }}
+            className={inputCls}
+          />
+        </Field>
+
+        {loan.status === "completed" && (
+          <div className="p-3 rounded-xl bg-primary/10 border border-primary/20 space-y-2">
+            <label className="flex items-center gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={reactivate}
+                onChange={e => setReactivate(e.target.checked)}
+                className="w-4 h-4 rounded border-primary text-primary focus:ring-primary/40 bg-neu"
+              />
+              <span className="text-sm font-medium text-foreground">Reactivate loan & resume payment reminders</span>
+            </label>
+            <p className="text-xs text-muted-foreground pl-6">
+              If checked, next due date will be calculated automatically based on your reminder settings.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400 font-medium">
+            {error}
+          </div>
+        )}
+
+        <div className="flex gap-3 pt-1">
+          <button onClick={onClose} className={btnGhost}>Cancel</button>
+          <button onClick={save} className={btnPrimary}>Save End Date</button>
         </div>
       </div>
     </Modal>

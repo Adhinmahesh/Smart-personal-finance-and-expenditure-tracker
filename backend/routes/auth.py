@@ -24,8 +24,58 @@ def login():
     result = AuthService.login(data)
     
     if "error" in result:
-        return error_response(result["error"], result["status"])
+        return error_response(result["error"], result["status"], data=result.get("data"))
     return success_response(result["data"], "Login successful", result["status"])
+
+@auth_bp.route('/verify-email', methods=['POST'])
+@limiter.limit("10 per minute")
+def verify_email():
+    data = request.get_json()
+    result = AuthService.verify_email(data)
+    
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Email verified successfully", result["status"])
+
+@auth_bp.route('/resend-verification', methods=['POST'])
+@limiter.limit("5 per minute")
+def resend_verification():
+    data = request.get_json()
+    result = AuthService.resend_verification(data)
+    
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Verification code resent successfully", result["status"])
+
+@auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit("5 per minute")
+def forgot_password():
+    data = request.get_json()
+    result = AuthService.forgot_password(data)
+    
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Password reset link sent", result["status"])
+
+@auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit("10 per minute")
+def reset_password():
+    data = request.get_json()
+    result = AuthService.reset_password(data)
+    
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Password reset successfully", result["status"])
+
+@auth_bp.route('/google', methods=['POST'])
+@limiter.limit("20 per minute")
+def google_auth():
+    data = request.get_json()
+    result = AuthService.google_auth(data)
+    
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(result["data"], "Google login successful", result["status"])
 
 @auth_bp.route('/refresh', methods=['POST'])
 @limiter.limit("10 per minute")

@@ -76,3 +76,16 @@ export function useSwitchReminderType() {
     },
   });
 }
+
+export function useUpdateEndDate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { loanId: number; endDate: string | null; nextDue?: string | null; status?: string }) => {
+      const { loanId, ...body } = params;
+      return apiFetch(`/loans/${loanId}/end-date`, { method: "PUT", body: JSON.stringify(body) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["loans"] });
+    },
+  });
+}

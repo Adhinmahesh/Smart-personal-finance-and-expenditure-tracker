@@ -35,3 +35,8 @@ class LoanDueDateUpdateSchema(Schema):
     nextDue = fields.Date(required=True)
     changeType = fields.String(required=True, validate=validate.OneOf(["temporary", "permanent"]))
     reminderType = fields.String(required=True, validate=validate.OneOf(["monthly", "weekly"]))
+
+class LoanEndDateUpdateSchema(Schema):
+    endDate = fields.Date(required=False, allow_none=True)
+    nextDue = fields.Date(required=False, allow_none=True)
+    status = fields.String(required=False, validate=validate.OneOf(["active", "completed"]))

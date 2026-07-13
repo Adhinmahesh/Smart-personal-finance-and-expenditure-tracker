@@ -2,7 +2,7 @@ import datetime
 import logging
 from marshmallow import ValidationError
 from models.loan import LoanModel
-from schemas.loan_schema import LoanSchema, LoanPaymentSchema, LoanReminderUpdateSchema, LoanDueDateUpdateSchema
+from schemas.loan_schema import LoanSchema, LoanPaymentSchema, LoanReminderUpdateSchema, LoanDueDateUpdateSchema, LoanEndDateUpdateSchema
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +96,25 @@ class LoanService:
         except Exception as e:
             logger.exception("Error updating due date")
             return {"error": "Failed to update due date", "status": 500}
+
+    @staticmethod
+    def update_end_date(user_id, loan_id, data):
+        schema = LoanEndDateUpdateSchema()
+        try:
+            validated_data = schema.load(data)
+        except ValidationError as err:
+            return {"error": err.messages, "status": 400}
+        
+        try:
+            success = LoanModel.update_end_date(
+                user_id, loan_id, validated_data.get('endDate'), validated_data.get('nextDue'), validated_data.get('status')
+            )
+            if success:
+                return {"success": True, "status": 200}
+            return {"error": "Loan not found", "status": 404}
+        except Exception as e:
+            logger.exception("Error updating end date")
+            return {"error": "Failed to update end date", "status": 500}
 
     @staticmethod
     def delete_loan(user_id, loan_id):

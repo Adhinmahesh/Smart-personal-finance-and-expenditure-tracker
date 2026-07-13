@@ -93,8 +93,8 @@ class LoanModel:
         try:
             cur = conn.cursor()
             
-            # Verify ownership
-            cur.execute("SELECT id, reminder_type, reminder_day, reminder_weekday, next_due FROM loans WHERE id = %s AND user_id = %s", (loan_id, user_id))
+            # Verify ownership and check end_date
+            cur.execute("SELECT id, reminder_type, reminder_day, reminder_weekday, next_due, end_date FROM loans WHERE id = %s AND user_id = %s", (loan_id, user_id))
             loan = cur.fetchone()
             if not loan: return None
 
@@ -104,28 +104,73 @@ class LoanModel:
                 WHERE loan_id = %s AND status = 'pending'
             """, (date_str, amount, loan_id))
             
-            # Update totals and calculate next due
+            # Update totals and calculate next due — ALWAYS advance to next period
             today = datetime.date.today()
-            if loan[1] == 'weekly':
-                diff = (loan[3] - today.weekday() + 7) % 7 or 7
-                next_due = today + datetime.timedelta(days=diff)
-            else:
-                next_due = datetime.date(today.year, today.month, loan[2])
-                if next_due <= today:
-                    if next_due.month == 12:
-                        next_due = datetime.date(today.year + 1, 1, loan[2])
-                    else:
-                        next_due = datetime.date(today.year, today.month + 1, loan[2])
-
-            cur.execute("""
-                UPDATE loans SET total_paid = total_paid + %s, next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s
-            """, (amount, next_due, loan_id))
+            current_next_due = loan[4]  # current next_due from DB
+            end_date = loan[5]          # end_date from DB
             
-            # Add new pending payment for next cycle
-            cur.execute("""
-                INSERT INTO loan_payments (loan_id, due_date, status)
-                VALUES (%s, %s, 'pending')
-            """, (loan_id, next_due))
+            if loan[1] == 'weekly':
+                # Weekly: always advance at least 7 days from the current due date,
+                # but if that's still in the past, keep adding 7 until it's in the future
+                if current_next_due:
+                    next_due = current_next_due + datetime.timedelta(days=7)
+                    while next_due <= today:
+                        next_due += datetime.timedelta(days=7)
+                else:
+                    diff = (loan[3] - today.weekday() + 7) % 7 or 7
+                    next_due = today + datetime.timedelta(days=diff)
+            else:
+                # Monthly: advance from current due date to next month
+                if current_next_due:
+                    # Move to next month from the current due date
+                    month = current_next_due.month
+                    year = current_next_due.year
+                    if month == 12:
+                        next_due = datetime.date(year + 1, 1, loan[2])
+                    else:
+                        # Handle months with fewer days (e.g., reminder_day=31 in Feb)
+                        import calendar
+                        next_month = month + 1
+                        next_year = year
+                        max_day = calendar.monthrange(next_year, next_month)[1]
+                        day = min(loan[2], max_day)
+                        next_due = datetime.date(next_year, next_month, day)
+                    # If somehow still in the past (e.g., multiple missed payments), keep advancing
+                    while next_due <= today:
+                        if next_due.month == 12:
+                            next_due = datetime.date(next_due.year + 1, 1, loan[2])
+                        else:
+                            import calendar
+                            nm = next_due.month + 1
+                            ny = next_due.year
+                            max_day = calendar.monthrange(ny, nm)[1]
+                            day = min(loan[2], max_day)
+                            next_due = datetime.date(ny, nm, day)
+                else:
+                    next_due = datetime.date(today.year, today.month, loan[2])
+                    if next_due <= today:
+                        if next_due.month == 12:
+                            next_due = datetime.date(today.year + 1, 1, loan[2])
+                        else:
+                            next_due = datetime.date(today.year, today.month + 1, loan[2])
+
+            # Check if the newly computed next_due is BEYOND the loan's end_date
+            if end_date and next_due > end_date:
+                # Loan reached or exceeded its end date! Mark completed and clear next_due.
+                cur.execute("""
+                    UPDATE loans SET total_paid = total_paid + %s, next_due = NULL, status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = %s
+                """, (amount, loan_id))
+                cur.execute("DELETE FROM loan_payments WHERE loan_id = %s AND status = 'pending'", (loan_id,))
+            else:
+                cur.execute("""
+                    UPDATE loans SET total_paid = total_paid + %s, next_due = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s
+                """, (amount, next_due, loan_id))
+                
+                # Add new pending payment for next cycle
+                cur.execute("""
+                    INSERT INTO loan_payments (loan_id, due_date, status)
+                    VALUES (%s, %s, 'pending')
+                """, (loan_id, next_due))
             
             # Also record in transactions
             cur.execute("""
@@ -149,9 +194,40 @@ class LoanModel:
         cur = None
         try:
             cur = conn.cursor()
-            cur.execute("UPDATE loans SET status = 'completed', updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (loan_id, user_id))
+            cur.execute("UPDATE loans SET status = 'completed', next_due = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (loan_id, user_id))
+            cur.execute("DELETE FROM loan_payments WHERE loan_id = %s AND status = 'pending'", (loan_id,))
             conn.commit()
             return cur.rowcount > 0
+        finally:
+            if cur:
+                cur.close()
+            release_connection(conn)
+
+    @staticmethod
+    def update_end_date(user_id, loan_id, end_date, next_due=None, status=None):
+        conn = get_connection()
+        cur = None
+        try:
+            cur = conn.cursor()
+            # Verify ownership
+            cur.execute("SELECT id, status FROM loans WHERE id = %s AND user_id = %s", (loan_id, user_id))
+            loan = cur.fetchone()
+            if not loan: return False
+            
+            new_status = status or loan[1]
+            if new_status == 'completed' or not next_due:
+                cur.execute("UPDATE loans SET end_date = %s, next_due = NULL, status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (end_date, new_status, loan_id, user_id))
+                cur.execute("DELETE FROM loan_payments WHERE loan_id = %s AND status = 'pending'", (loan_id,))
+            else:
+                cur.execute("UPDATE loans SET end_date = %s, next_due = %s, status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s AND user_id = %s", (end_date, next_due, new_status, loan_id, user_id))
+                cur.execute("SELECT id FROM loan_payments WHERE loan_id = %s AND status = 'pending'", (loan_id,))
+                pending = cur.fetchone()
+                if pending:
+                    cur.execute("UPDATE loan_payments SET due_date = %s WHERE id = %s", (next_due, pending[0]))
+                else:
+                    cur.execute("INSERT INTO loan_payments (loan_id, due_date, status) VALUES (%s, %s, 'pending')", (loan_id, next_due))
+            conn.commit()
+            return True
         finally:
             if cur:
                 cur.close()

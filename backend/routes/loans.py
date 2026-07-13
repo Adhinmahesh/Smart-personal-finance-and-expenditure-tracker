@@ -75,6 +75,18 @@ def update_due_date(loan_id):
         return error_response(result["error"], result["status"])
     return success_response(None, "Due date updated", result["status"])
 
+@loans_bp.route('/<string:loan_id>/end-date', methods=['PUT'])
+@limiter.limit("30 per minute")
+@jwt_required()
+def update_end_date(loan_id):
+    user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    result = LoanService.update_end_date(user_id, loan_id, data)
+    if "error" in result:
+        return error_response(result["error"], result["status"])
+    return success_response(None, "End date updated", result["status"])
+
 @loans_bp.route('/<string:loan_id>', methods=['DELETE'])
 @limiter.limit("30 per minute")
 @jwt_required()
